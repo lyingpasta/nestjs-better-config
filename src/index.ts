@@ -6,3 +6,4 @@ export { EnvReaderOptions, resolveEnvKeys } from './env-reader';
 export { BetterConfigService } from './better-config.service';
 export { EnvAuditService } from './env-audit.service';
 export { ConsoleReporter } from './reporters/console.reporter';
+export { BetterConfigModule } from './better-config.module';
