@@ -5,3 +5,4 @@ export { IReporter } from './reporters/reporter.interface';
 export { EnvReaderOptions, resolveEnvKeys } from './env-reader';
 export { BetterConfigService } from './better-config.service';
 export { EnvAuditService } from './env-audit.service';
+export { ConsoleReporter } from './reporters/console.reporter';
