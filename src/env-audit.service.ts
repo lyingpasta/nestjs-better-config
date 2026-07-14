@@ -1,9 +1,11 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { AuditOptions } from './interfaces/audit-options.interface';
+import { IReporter } from './reporters/reporter.interface';
+import { ConsoleReporter } from './reporters/console.reporter';
 
 @Injectable()
 export class EnvAuditService implements OnApplicationBootstrap {
-  private readonly logger = new Logger('BetterConfig');
+  private reporter: IReporter = new ConsoleReporter();
 
   private declaredKeys: string[] = [];
   private usedKeys: Set<string> = new Set();
@@ -19,9 +21,13 @@ export class EnvAuditService implements OnApplicationBootstrap {
     declaredKeys: string[],
     usedKeys: Set<string>,
     options: AuditOptions,
+    reporter?: IReporter,
   ): void {
     this.declaredKeys = declaredKeys;
     this.usedKeys = usedKeys;
+    if (reporter) {
+      this.reporter = reporter;
+    }
     this.options = {
       enabled: options.enabled ?? process.env.NODE_ENV !== 'production',
       warnOnUnused: options.warnOnUnused ?? true,
@@ -42,20 +48,12 @@ export class EnvAuditService implements OnApplicationBootstrap {
     );
 
     if (unused.length === 0) {
-      this.logger.log('All environment variables are accounted for. ✓');
+      this.reporter.reportAllAccounted();
       return;
     }
 
     if (this.options.warnOnUnused) {
-      this.logger.warn(
-        `${unused.length} environment variable(s) declared but never accessed:`,
-      );
-      for (const key of unused) {
-        this.logger.warn(`  ✗ ${key}`);
-      }
-      this.logger.warn(
-        'These may be safe to remove. Disable with audit.warnOnUnused: false',
-      );
+      this.reporter.reportUnused(unused);
     }
 
     if (this.options.throwOnUnused) {

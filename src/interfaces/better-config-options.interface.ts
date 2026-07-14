@@ -1,4 +1,5 @@
 import { AuditOptions } from './audit-options.interface';
+import { IReporter } from '../reporters/reporter.interface';
 
 export interface BetterConfigOptions {
   /**
@@ -10,4 +11,6 @@ export interface BetterConfigOptions {
   envFilePath?: string;
   /** Audit behaviour options. */
   audit?: AuditOptions;
+  /** Custom audit result reporter. Default: ConsoleReporter. */
+  reporter?: IReporter;
 }

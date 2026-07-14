@@ -71,6 +71,7 @@ export class BetterConfigModule implements OnModuleInit {
       declaredKeys,
       this.betterConfigService.usedKeys,
       auditOptions,
+      this.options.reporter,
     );
   }
 }

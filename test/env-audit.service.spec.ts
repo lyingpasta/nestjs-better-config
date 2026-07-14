@@ -161,6 +161,35 @@ describe('EnvAuditService', () => {
     });
   });
 
+  describe('custom reporter', () => {
+    it('routes unused report through provided IReporter', () => {
+      const reporter = {
+        reportUnused: jest.fn(),
+        reportAllAccounted: jest.fn(),
+      };
+      service.configure(['OLD_KEY'], new Set(), { enabled: true }, reporter);
+      service.onApplicationBootstrap();
+      expect(reporter.reportUnused).toHaveBeenCalledWith(['OLD_KEY']);
+      expect(reporter.reportAllAccounted).not.toHaveBeenCalled();
+    });
+
+    it('routes all-accounted report through provided IReporter', () => {
+      const reporter = {
+        reportUnused: jest.fn(),
+        reportAllAccounted: jest.fn(),
+      };
+      service.configure(
+        ['DATABASE_URL'],
+        new Set(['DATABASE_URL']),
+        { enabled: true },
+        reporter,
+      );
+      service.onApplicationBootstrap();
+      expect(reporter.reportAllAccounted).toHaveBeenCalled();
+      expect(reporter.reportUnused).not.toHaveBeenCalled();
+    });
+  });
+
   describe('enabled: false', () => {
     it('skips all audit logic silently', () => {
       service.configure(['OLD_KEY', 'DEAD_VAR'], new Set(), { enabled: false });
