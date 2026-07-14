@@ -23,6 +23,15 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: Verify tarball contains the package entry
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0))[0].files.map(f => f.path);
+            if (!files.includes('dist/index.js')) {
+              console.error('dist/index.js missing from tarball — refusing to publish. Files:', files);
+              process.exit(1);
+            }
+          "
       - name: Verify tag matches package version
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
