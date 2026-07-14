@@ -1,6 +1,6 @@
 {
   "name": "nestjs-better-config",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "NestJS companion module to @nestjs/config — audits unused environment variables",
   "license": "MIT",
   "author": "lyingpasta",
