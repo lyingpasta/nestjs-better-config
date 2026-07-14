@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { BetterConfigModule } from '../src/better-config.module';
 import { BetterConfigService } from '../src/better-config.service';
@@ -57,8 +57,8 @@ describe('BetterConfigModule', () => {
     });
   });
 
-  describe('ConfigService proxy', () => {
-    it('ConfigService resolved via ModuleRef is correctly proxied after init', async () => {
+  describe('ConfigService instance patching', () => {
+    it('BetterConfigService holds the real ConfigService after init', async () => {
       const module = await Test.createTestingModule({
         imports: [
           ConfigModule.forRoot({ ignoreEnvFile: true }),
@@ -67,11 +67,11 @@ describe('BetterConfigModule', () => {
       }).compile();
       await module.init();
       const svc = module.get(BetterConfigService);
-      expect(svc.proxy).toBeDefined();
+      expect(svc.configService).toBe(module.get(ConfigService));
       await module.close();
     });
 
-    it('get() calls on proxied instance are tracked in usedKeys', async () => {
+    it('get() on the plain injected ConfigService is tracked in usedKeys', async () => {
       process.env.DATABASE_URL = 'postgres://localhost/test';
       const module = await Test.createTestingModule({
         imports: [
@@ -80,10 +80,28 @@ describe('BetterConfigModule', () => {
         ],
       }).compile();
       await module.init();
+      const configService = module.get(ConfigService);
+      expect(configService.get('DATABASE_URL')).toBe('postgres://localhost/test');
       const svc = module.get(BetterConfigService);
-      svc.proxy.get('DATABASE_URL');
       expect(svc.usedKeys.has('DATABASE_URL')).toBe(true);
       delete process.env.DATABASE_URL;
+      await module.close();
+    });
+
+    it('getOrThrow() on the plain injected ConfigService is tracked', async () => {
+      process.env.API_KEY = 'secret';
+      const module = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({ ignoreEnvFile: true }),
+          BetterConfigModule.forRoot({ audit: { enabled: false } }),
+        ],
+      }).compile();
+      await module.init();
+      const configService = module.get(ConfigService);
+      expect(configService.getOrThrow('API_KEY')).toBe('secret');
+      const svc = module.get(BetterConfigService);
+      expect(svc.usedKeys.has('API_KEY')).toBe(true);
+      delete process.env.API_KEY;
       await module.close();
     });
   });
