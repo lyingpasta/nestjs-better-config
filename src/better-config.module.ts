@@ -7,7 +7,10 @@ import {
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { BetterConfigOptions } from './interfaces/better-config-options.interface';
-import { BetterConfigService } from './better-config.service';
+import {
+  BetterConfigService,
+  trackConfigServiceKeys,
+} from './better-config.service';
 import { EnvAuditService } from './env-audit.service';
 import { resolveEnvKeys } from './env-reader';
 
@@ -24,11 +27,18 @@ export class BetterConfigModule implements OnModuleInit {
 
   // TODO: implement forRootAsync (v1) — needed for async config factories
   static forRoot(options: BetterConfigOptions = {}): DynamicModule {
+    // Patch ConfigService.prototype now — module definition time — so key
+    // reads in consumer constructors (which run before lifecycle hooks) are
+    // already tracked.
+    const usedKeys = trackConfigServiceKeys();
     return {
       module: BetterConfigModule,
       providers: [
         { provide: BETTER_CONFIG_OPTIONS, useValue: options },
-        { provide: BetterConfigService, useFactory: () => new BetterConfigService() },
+        {
+          provide: BetterConfigService,
+          useFactory: () => new BetterConfigService(usedKeys),
+        },
         EnvAuditService,
       ],
       exports: [BetterConfigService, EnvAuditService],

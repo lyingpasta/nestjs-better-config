@@ -1,135 +1,124 @@
 import { ConfigService } from '@nestjs/config';
-import { BetterConfigService } from '../src/better-config.service';
+import {
+  BetterConfigService,
+  trackConfigServiceKeys,
+} from '../src/better-config.service';
 
-function makeMockConfigService(): jest.Mocked<
-  Pick<ConfigService, 'get' | 'getOrThrow'>
-> &
-  Record<string, unknown> {
-  return {
-    get: jest.fn(),
-    getOrThrow: jest.fn(),
-  };
-}
-
-describe('BetterConfigService', () => {
-  let mock: ReturnType<typeof makeMockConfigService>;
-  let origGet: jest.Mock;
-  let origGetOrThrow: jest.Mock;
+describe('trackConfigServiceKeys', () => {
+  let usedKeys: Set<string>;
   let cs: ConfigService;
-  let svc: BetterConfigService;
 
   beforeEach(() => {
-    mock = makeMockConfigService();
-    origGet = mock.get as jest.Mock;
-    origGetOrThrow = mock.getOrThrow as jest.Mock;
-    cs = mock as unknown as ConfigService;
-    svc = new BetterConfigService(cs);
+    process.env.TRACK_TEST_KEY = 'value';
+    process.env.TRACK_TEST_OTHER = 'other';
+    usedKeys = trackConfigServiceKeys();
+    cs = new ConfigService();
   });
 
-  describe('patched get()', () => {
-    it('records key in usedKeys', () => {
-      origGet.mockReturnValue('value');
-      cs.get('DATABASE_URL');
-      expect(svc.usedKeys.has('DATABASE_URL')).toBe(true);
+  afterEach(() => {
+    delete process.env.TRACK_TEST_KEY;
+    delete process.env.TRACK_TEST_OTHER;
+  });
+
+  describe('get()', () => {
+    it('records accessed key', () => {
+      cs.get('TRACK_TEST_KEY');
+      expect(usedKeys.has('TRACK_TEST_KEY')).toBe(true);
     });
 
     it('records multiple distinct keys', () => {
-      origGet.mockReturnValue('value');
-      cs.get('DATABASE_URL');
-      cs.get('PORT');
-      expect(svc.usedKeys.size).toBe(2);
+      cs.get('TRACK_TEST_KEY');
+      cs.get('TRACK_TEST_OTHER');
+      expect(usedKeys.size).toBe(2);
     });
 
-    it('deduplicates repeated calls for same key', () => {
-      origGet.mockReturnValue('value');
-      cs.get('DATABASE_URL');
-      cs.get('DATABASE_URL');
-      expect(svc.usedKeys.size).toBe(1);
+    it('deduplicates repeated reads of same key', () => {
+      cs.get('TRACK_TEST_KEY');
+      cs.get('TRACK_TEST_KEY');
+      expect(usedKeys.size).toBe(1);
     });
 
-    it('returns identical value to original ConfigService', () => {
-      origGet.mockReturnValue('postgres://localhost/db');
-      expect(cs.get('DATABASE_URL')).toBe('postgres://localhost/db');
+    it('returns the real value unchanged', () => {
+      expect(cs.get('TRACK_TEST_KEY')).toBe('value');
     });
 
-    it('forwards key to original ConfigService', () => {
-      origGet.mockReturnValue('3000');
-      cs.get('PORT');
-      expect(origGet).toHaveBeenCalledWith('PORT');
+    it('returns defaultValue for missing key', () => {
+      expect(cs.get('TRACK_TEST_MISSING', 'fallback')).toBe('fallback');
     });
 
-    it('forwards defaultValue to original ConfigService', () => {
-      origGet.mockReturnValue('8080');
-      cs.get('PORT', '8080');
-      expect(origGet).toHaveBeenCalledWith('PORT', '8080');
+    it('returns undefined for missing key without default', () => {
+      expect(cs.get('TRACK_TEST_MISSING')).toBeUndefined();
     });
 
-    it('preserves arity: no extra arguments passed when omitted', () => {
-      origGet.mockReturnValue('value');
-      cs.get('KEY');
-      expect(origGet).toHaveBeenCalledWith('KEY');
-      expect(origGet.mock.calls[0]).toHaveLength(1);
-    });
-
-    it('preserves generic: get<string>() returns string value', () => {
-      origGet.mockReturnValue('hello');
-      const result: string | undefined = cs.get<string>('KEY');
-      expect(result).toBe('hello');
-    });
-
-    it('returns undefined when key absent and no default', () => {
-      origGet.mockReturnValue(undefined);
-      expect(cs.get('MISSING')).toBeUndefined();
+    it('records missing keys too (they were still asked for)', () => {
+      cs.get('TRACK_TEST_MISSING');
+      expect(usedKeys.has('TRACK_TEST_MISSING')).toBe(true);
     });
   });
 
-  describe('patched getOrThrow()', () => {
-    it('calls original getOrThrow and returns result', () => {
-      origGetOrThrow.mockReturnValue('secret');
-      expect(cs.getOrThrow('API_KEY')).toBe('secret');
-      expect(origGetOrThrow).toHaveBeenCalledWith('API_KEY');
+  describe('getOrThrow()', () => {
+    it('records accessed key and returns value', () => {
+      expect(cs.getOrThrow('TRACK_TEST_KEY')).toBe('value');
+      expect(usedKeys.has('TRACK_TEST_KEY')).toBe(true);
     });
 
-    it('records key in usedKeys', () => {
-      origGetOrThrow.mockReturnValue('secret');
-      cs.getOrThrow('API_KEY');
-      expect(svc.usedKeys.has('API_KEY')).toBe(true);
-    });
-
-    it('propagates throw from original getOrThrow', () => {
-      origGetOrThrow.mockImplementation(() => {
-        throw new Error('Missing required key: API_KEY');
-      });
-      expect(() => cs.getOrThrow('API_KEY')).toThrow(
-        'Missing required key: API_KEY',
-      );
+    it('still throws on missing key', () => {
+      expect(() => cs.getOrThrow('TRACK_TEST_MISSING')).toThrow();
     });
   });
 
-  describe('initialization', () => {
-    it('configService getter throws before initialize', () => {
-      const uninitialized = new BetterConfigService();
-      expect(() => uninitialized.configService).toThrow(
-        /not initialized/,
-      );
+  describe('patch semantics', () => {
+    it('tracks reads from every ConfigService instance', () => {
+      const other = new ConfigService();
+      other.get('TRACK_TEST_OTHER');
+      expect(usedKeys.has('TRACK_TEST_OTHER')).toBe(true);
     });
 
-    it('configService getter returns instance after initialize', () => {
-      expect(svc.configService).toBe(cs);
+    it('tracks constructor-time reads (instance created after patch)', () => {
+      class Consumer {
+        readonly value: string | undefined;
+        constructor(config: ConfigService) {
+          this.value = config.get('TRACK_TEST_KEY');
+        }
+      }
+      const consumer = new Consumer(new ConfigService());
+      expect(consumer.value).toBe('value');
+      expect(usedKeys.has('TRACK_TEST_KEY')).toBe(true);
     });
 
-    it('initialize is idempotent — no double-wrapping', () => {
-      origGet.mockReturnValue('value');
-      svc.initialize(cs);
-      svc.initialize(cs);
-      cs.get('KEY');
-      expect(origGet).toHaveBeenCalledTimes(1);
-      expect(svc.usedKeys.has('KEY')).toBe(true);
+    it('calling again starts a fresh set without double-wrapping', () => {
+      cs.get('TRACK_TEST_KEY');
+      const fresh = trackConfigServiceKeys();
+      expect(fresh.size).toBe(0);
+      cs.get('TRACK_TEST_OTHER');
+      expect(fresh.has('TRACK_TEST_OTHER')).toBe(true);
+      expect(fresh.has('TRACK_TEST_KEY')).toBe(false);
     });
+  });
+});
 
-    it('does not touch other properties of the instance', () => {
-      (mock as any).isCacheEnabled = true;
-      expect((cs as any).isCacheEnabled).toBe(true);
-    });
+describe('BetterConfigService', () => {
+  it('configService getter throws before initialize', () => {
+    const svc = new BetterConfigService();
+    expect(() => svc.configService).toThrow(/not initialized/);
+  });
+
+  it('configService getter returns instance after initialize', () => {
+    const svc = new BetterConfigService();
+    const cs = new ConfigService();
+    svc.initialize(cs);
+    expect(svc.configService).toBe(cs);
+  });
+
+  it('uses the provided usedKeys set', () => {
+    const shared = new Set<string>(['SEEDED']);
+    const svc = new BetterConfigService(shared);
+    expect(svc.usedKeys).toBe(shared);
+    expect(svc.usedKeys.has('SEEDED')).toBe(true);
+  });
+
+  it('defaults to an empty set when none provided', () => {
+    const svc = new BetterConfigService();
+    expect(svc.usedKeys.size).toBe(0);
   });
 });
