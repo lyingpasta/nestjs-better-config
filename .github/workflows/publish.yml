@@ -18,6 +18,7 @@ jobs:
           node-version: 20
           cache: npm
           registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest # OIDC trusted publishing needs npm >= 11.5
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -29,6 +30,4 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match package version $PKG_VERSION" >&2
             exit 1
           fi
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --access public # auth + provenance via OIDC trusted publisher
