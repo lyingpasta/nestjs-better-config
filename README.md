@@ -1,86 +1,17 @@
 # nestjs-better-config
 
-Companion module for `@nestjs/config` that warns you about environment variables that were declared but never accessed — with zero migration cost.
+[![npm](https://img.shields.io/npm/v/nestjs-better-config)](https://www.npmjs.com/package/nestjs-better-config)
+[![CI](https://github.com/lyingpasta/nestjs-better-config/actions/workflows/ci.yml/badge.svg)](https://github.com/lyingpasta/nestjs-better-config/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/nestjs-better-config)](./LICENSE)
 
-## Install
+Warns you at startup about environment variables that are declared but never
+actually read by your NestJS app.
 
-```bash
-# npm
-npm install nestjs-better-config
-
-# yarn
-yarn add nestjs-better-config
-
-# pnpm
-pnpm add nestjs-better-config
-```
-
-> **Peer dependencies:** `@nestjs/common ^10`, `@nestjs/core ^10`, `@nestjs/config ^3`
-
----
-
-## Setup
-
-`ConfigModule` stays **completely untouched**. Just add `BetterConfigModule` alongside it.
-
-```typescript
-// app.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { BetterConfigModule } from 'nestjs-better-config';
-import { z } from 'zod';
-
-@Module({
-  imports: [
-    // ── before: unchanged ──────────────────────────────────────
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-      validationSchema: z.object({
-        DATABASE_URL: z.string().url(),
-        PORT: z.string().default('3000'),
-      }),
-    }),
-
-    // ── after: just add this ────────────────────────────────────
-    BetterConfigModule.forRoot({
-      validationSchema: z.object({
-        DATABASE_URL: z.string().url(),
-        PORT: z.string().default('3000'),
-      }),
-      envFilePath: '.env',
-      audit: {
-        enabled: true,
-        warnOnUnused: true,
-        throwOnUnused: false,
-        ignoreKeys: ['NODE_ENV'],
-        ignorePrefixes: ['npm_'],
-      },
-    }),
-  ],
-})
-export class AppModule {}
-```
-
----
-
-## How it works
-
-`BetterConfigModule.forRoot()` wraps `get` and `getOrThrow` on
-`ConfigService.prototype` at module definition time — before any provider is
-instantiated — recording every accessed key. Constructor-time reads, the most
-common pattern, are therefore tracked. At `onApplicationBootstrap`, the
-recorded set is compared against the declared key list (Zod schema or `.env`
-file) and the difference is reported.
-
-No DI overrides, no wrapper service: application code keeps injecting
-`ConfigService` as usual.
-
----
-
-## Startup output
-
-When unused variables are found:
+Every long-lived project accumulates them: the `.env` grows, features get
+removed, and nobody dares delete `LEGACY_REDIS_URL` because *maybe something
+still uses it*. This module answers that question. It watches every
+`ConfigService.get()` and `getOrThrow()` call during startup, compares the
+keys you read against the keys you declared, and prints the difference.
 
 ```
 [Nest] WARN  [BetterConfig] 3 environment variable(s) declared but never accessed:
@@ -90,134 +21,165 @@ When unused variables are found:
 [Nest] WARN  [BetterConfig] These may be safe to remove. Disable with audit.warnOnUnused: false
 ```
 
-When all variables are accounted for:
+## Installation
 
+```bash
+npm install nestjs-better-config
 ```
-[Nest] LOG   [BetterConfig] All environment variables are accounted for. ✓
-```
 
----
+Peer dependencies: `@nestjs/common ^10`, `@nestjs/core ^10`, `@nestjs/config ^3`.
 
-## Audit options
+## Usage
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | `boolean` | `NODE_ENV !== 'production'` | Master switch. When `false`, module registers but all audit logic is skipped — zero overhead. |
-| `warnOnUnused` | `boolean` | `true` | Log a `WARN` for each undeclared variable. |
-| `throwOnUnused` | `boolean` | `false` | Throw an `Error` after logging when unused variables are found. Set `true` in CI. |
-| `ignoreKeys` | `string[]` | `[]` | Exact key names to exclude from the unused report. |
-| `ignorePrefixes` | `string[]` | `[]` | Key prefixes to exclude. Any key starting with a listed prefix is ignored. |
-
----
-
-## Zod schema integration
-
-Pass the same Zod schema you use in `ConfigModule`. `nestjs-better-config` extracts the declared key list from `schema.shape` — Zod is never imported as a hard dependency.
+Keep your existing `ConfigModule` setup as is and register
+`BetterConfigModule` next to it:
 
 ```typescript
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { BetterConfigModule } from 'nestjs-better-config';
 import { z } from 'zod';
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   PORT: z.string().default('3000'),
-  REDIS_URL: z.string().url(),
-  JWT_SECRET: z.string().min(32),
 });
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validationSchema: envSchema }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: (config) => envSchema.parse(config),
+    }),
     BetterConfigModule.forRoot({
-      validationSchema: envSchema,        // same object — or a separate copy
-      audit: { enabled: true },
+      validationSchema: envSchema,
     }),
   ],
 })
 export class AppModule {}
 ```
 
----
+That's the whole migration. Your services keep injecting `ConfigService` and
+reading config exactly as before; nothing else changes.
 
-## `.env` fallback (no schema)
+The audit runs on `onApplicationBootstrap` and is enabled by default whenever
+`NODE_ENV` is not `production`.
 
-No Zod schema? Pass `envFilePath` and `nestjs-better-config` parses the file with `dotenv.parse()` to build the declared key list. `dotenv.config()` is never called — no side effects to `process.env`.
+## Where the declared key list comes from
+
+You have two options.
+
+**A Zod schema.** Pass the same schema you already give to `ConfigModule`.
+The key list is taken from `schema.shape`, so Zod stays a dev dependency of
+your app, not of this package.
+
+**A `.env` file.** If you don't use a schema, point `envFilePath` at your env
+file (defaults to `.env` in the working directory). The file is parsed with
+`dotenv.parse()` only; `dotenv.config()` is never called, so `process.env` is
+not touched.
 
 ```typescript
 BetterConfigModule.forRoot({
-  envFilePath: '.env',
-  audit: { enabled: true },
+  envFilePath: '.env.production',
 })
 ```
 
-If `envFilePath` is omitted too, it falls back to `.env` in the current working directory.
+When both are provided, the schema wins.
 
----
+## Options
 
-## CI usage
+```typescript
+BetterConfigModule.forRoot({
+  validationSchema: envSchema,
+  envFilePath: '.env',
+  audit: {
+    enabled: true,
+    warnOnUnused: true,
+    throwOnUnused: false,
+    ignoreKeys: ['NODE_ENV', 'TZ'],
+    ignorePrefixes: ['npm_', 'VERCEL_'],
+  },
+})
+```
 
-Set `throwOnUnused: true` to fail the process when unused variables are detected:
+| Option | Default | |
+|---|---|---|
+| `audit.enabled` | `NODE_ENV !== 'production'` | Master switch for the whole audit. |
+| `audit.warnOnUnused` | `true` | Log a warning listing unused keys. |
+| `audit.throwOnUnused` | `false` | Throw after logging. Useful in CI. |
+| `audit.ignoreKeys` | `[]` | Exact keys to leave out of the report. |
+| `audit.ignorePrefixes` | `[]` | Ignore any key starting with one of these. |
+| `reporter` | `ConsoleReporter` | Custom `IReporter` implementation, see below. |
+
+`ignoreKeys` and `ignorePrefixes` are handy for variables that exist for the
+platform rather than for your code, like the `npm_*` family npm injects into
+every process.
+
+## Failing CI on unused variables
 
 ```typescript
 BetterConfigModule.forRoot({
   validationSchema: envSchema,
   audit: {
-    enabled: true,
     throwOnUnused: process.env.CI === 'true',
   },
 })
 ```
 
-`nestjs-better-config` logs the unused key list before throwing, so you always know what to clean up.
+The unused key list is logged before the throw, so the CI output tells you
+what to clean up.
 
----
+## Custom reporters
 
-## Ignoring keys and prefixes
+If warnings in the Nest logger aren't where you want this information,
+implement `IReporter` and pass it in:
 
 ```typescript
+import { IReporter } from 'nestjs-better-config';
+
+class SlackReporter implements IReporter {
+  reportUnused(keys: string[]) {
+    // post to a channel, emit a metric, whatever fits your setup
+  }
+  reportAllAccounted() {}
+}
+
 BetterConfigModule.forRoot({
   validationSchema: envSchema,
-  audit: {
-    enabled: true,
-    // exact keys — e.g. always-present runtime variables
-    ignoreKeys: ['NODE_ENV', 'TZ'],
-    // prefixes — e.g. npm injects dozens of npm_* variables into process.env
-    ignorePrefixes: ['npm_', 'NEXT_', 'VERCEL_'],
-  },
+  reporter: new SlackReporter(),
 })
 ```
 
----
+## How it works
 
-## Known limitations
+`forRoot()` wraps `get` and `getOrThrow` on `ConfigService.prototype` at
+module definition time, before Nest instantiates any provider. That ordering
+matters: most config reads happen in constructors, which run before any
+lifecycle hook fires, so patching later would miss them. Each accessed key
+lands in a set, and at `onApplicationBootstrap` that set is diffed against
+the declared keys.
 
-- **Lazy config reads are not tracked.** Keys accessed inside request handlers, cron jobs, event listeners, or any code that runs after `onApplicationBootstrap` will not appear in `usedKeys`. They will be reported as unused even if they are actively consumed. This is a documented v0 caveat — see the Roadmap.
-- **`forRootAsync` is not yet supported.** If you need async config factories (e.g. reading schema from a remote source), wait for v1.
+There are no DI overrides and no wrapper service to inject. The trade-off is
+a prototype patch, which is honest to name for what it is: a monkey-patch. It
+is applied once, adds a set insertion per read, and is a no-op for behavior.
 
----
+## Limitations
 
-## Roadmap
+- Only reads that happen up to `onApplicationBootstrap` are counted. A key
+  read for the first time inside a request handler or a cron job will show up
+  as unused even though it isn't. If you have keys like that, put them in
+  `ignoreKeys`.
+- `forRootAsync` isn't implemented yet, so options can't come from an async
+  factory.
 
-**v1**
-- `forRootAsync` support — async config factories, `useFactory`, `useClass`
-- ESLint plugin (`eslint-plugin-better-config`) — static analysis of `configService.get()` calls at lint time
-
-**v2**
-- TypeScript compiler plugin — full static analysis without runtime tracking
-- Request-scoped and lazy config tracking
-
----
+Planned next: `forRootAsync`, and further out an ESLint plugin so the same
+check can run statically at lint time instead of at runtime.
 
 ## Contributing
 
-1. Fork the repo and create a feature branch
-2. `npm install`
-3. Make your changes — ensure `npm run lint` and `npm test` pass
-4. Open a pull request with a clear description of the change
-
-All contributions welcome: bug reports, feature requests, documentation improvements.
-
----
+Bug reports and PRs welcome. Run `npm test` and `npm run lint` before
+opening one.
 
 ## License
 
-MIT
+[MIT](./LICENSE)
