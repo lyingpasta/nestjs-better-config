@@ -1,4 +1,4 @@
-# better-config
+# nestjs-better-config
 
 Companion module for `@nestjs/config` that warns you about environment variables that were declared but never accessed — with zero migration cost.
 
@@ -6,13 +6,13 @@ Companion module for `@nestjs/config` that warns you about environment variables
 
 ```bash
 # npm
-npm install better-config
+npm install nestjs-better-config
 
 # yarn
-yarn add better-config
+yarn add nestjs-better-config
 
 # pnpm
-pnpm add better-config
+pnpm add nestjs-better-config
 ```
 
 > **Peer dependencies:** `@nestjs/common ^10`, `@nestjs/core ^10`, `@nestjs/config ^3`
@@ -27,7 +27,7 @@ pnpm add better-config
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BetterConfigModule } from 'better-config';
+import { BetterConfigModule } from 'nestjs-better-config';
 import { z } from 'zod';
 
 @Module({
@@ -61,6 +61,20 @@ import { z } from 'zod';
 })
 export class AppModule {}
 ```
+
+---
+
+## How it works
+
+`BetterConfigModule.forRoot()` wraps `get` and `getOrThrow` on
+`ConfigService.prototype` at module definition time — before any provider is
+instantiated — recording every accessed key. Constructor-time reads, the most
+common pattern, are therefore tracked. At `onApplicationBootstrap`, the
+recorded set is compared against the declared key list (Zod schema or `.env`
+file) and the difference is reported.
+
+No DI overrides, no wrapper service: application code keeps injecting
+`ConfigService` as usual.
 
 ---
 
@@ -98,7 +112,7 @@ When all variables are accounted for:
 
 ## Zod schema integration
 
-Pass the same Zod schema you use in `ConfigModule`. `better-config` extracts the declared key list from `schema.shape` — Zod is never imported as a hard dependency.
+Pass the same Zod schema you use in `ConfigModule`. `nestjs-better-config` extracts the declared key list from `schema.shape` — Zod is never imported as a hard dependency.
 
 ```typescript
 import { z } from 'zod';
@@ -126,7 +140,7 @@ export class AppModule {}
 
 ## `.env` fallback (no schema)
 
-No Zod schema? Pass `envFilePath` and `better-config` parses the file with `dotenv.parse()` to build the declared key list. `dotenv.config()` is never called — no side effects to `process.env`.
+No Zod schema? Pass `envFilePath` and `nestjs-better-config` parses the file with `dotenv.parse()` to build the declared key list. `dotenv.config()` is never called — no side effects to `process.env`.
 
 ```typescript
 BetterConfigModule.forRoot({
@@ -153,7 +167,7 @@ BetterConfigModule.forRoot({
 })
 ```
 
-`better-config` logs the unused key list before throwing, so you always know what to clean up.
+`nestjs-better-config` logs the unused key list before throwing, so you always know what to clean up.
 
 ---
 

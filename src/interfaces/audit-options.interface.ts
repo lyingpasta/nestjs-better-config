@@ -1,7 +1,7 @@
 export interface AuditOptions {
   /**
    * Enable audit logic. Defaults to `process.env.NODE_ENV !== 'production'`
-   * evaluated at forRoot() time.
+   * evaluated at module initialization.
    */
   enabled?: boolean;
   /** Warn on unused env vars. Default: true */

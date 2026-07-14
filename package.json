@@ -1,7 +1,22 @@
 {
-  "name": "better-config",
+  "name": "nestjs-better-config",
   "version": "0.0.1",
   "description": "NestJS companion module to @nestjs/config — audits unused environment variables",
+  "license": "MIT",
+  "author": "lyingpasta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lyingpasta/nestjs-better-config.git"
+  },
+  "keywords": [
+    "nestjs",
+    "config",
+    "environment",
+    "env",
+    "audit",
+    "dotenv",
+    "unused"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
