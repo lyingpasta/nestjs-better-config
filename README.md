@@ -163,9 +163,45 @@ There are no DI overrides and no wrapper service to inject. The trade-off is
 a prototype patch, which is honest to name for what it is: a monkey-patch. It
 is applied once, adds a set insertion per read, and is a no-op for behavior.
 
+## Reading config the audit can see
+
+The snapshot is taken at `onApplicationBootstrap`, so a key only counts as
+used if it is read during bootstrap. In practice that means reading config in
+constructors, provider factories, or `onModuleInit` — capturing values into
+fields — rather than calling `configService.get()` lazily wherever the value
+is needed:
+
+```typescript
+// ✅ Counted — read once at construction, cached in a field
+@Injectable()
+export class MailService {
+  private readonly apiKey: string;
+
+  constructor(config: ConfigService) {
+    this.apiKey = config.getOrThrow('MAIL_API_KEY');
+  }
+}
+
+// ❌ Not counted — first read happens at request time, after bootstrap
+@Injectable()
+export class MailService {
+  constructor(private readonly config: ConfigService) {}
+
+  send() {
+    const apiKey = this.config.getOrThrow('MAIL_API_KEY');
+  }
+}
+```
+
+The eager style is worth adopting regardless of this module: a missing or
+malformed variable fails at startup, not on the first request that happens to
+need it. For keys that genuinely can only be read later, list them in
+`ignoreKeys`.
+
 ## Limitations
 
-- Only reads that happen up to `onApplicationBootstrap` are counted. A key
+- Only reads that happen up to `onApplicationBootstrap` are counted — see
+  [Reading config the audit can see](#reading-config-the-audit-can-see). A key
   read for the first time inside a request handler or a cron job will show up
   as unused even though it isn't. If you have keys like that, put them in
   `ignoreKeys`.
