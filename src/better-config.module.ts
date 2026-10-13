@@ -1,9 +1,4 @@
-import {
-  DynamicModule,
-  Inject,
-  Module,
-  OnModuleInit,
-} from '@nestjs/common';
+import { DynamicModule, Inject, Module, OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { BetterConfigOptions } from './interfaces/better-config-options.interface';
@@ -15,12 +10,15 @@ import { EnvAuditService } from './env-audit.service';
 import { resolveEnvKeys } from './env-reader';
 
 const BETTER_CONFIG_OPTIONS = 'BETTER_CONFIG_OPTIONS';
+const MISSING_CONFIG_MODULE_ERROR =
+  'BetterConfigModule requires ConfigModule to be imported before it in your module.';
 
 @Module({})
 export class BetterConfigModule implements OnModuleInit {
   constructor(
     private readonly moduleRef: ModuleRef,
-    @Inject(BETTER_CONFIG_OPTIONS) private readonly options: BetterConfigOptions,
+    @Inject(BETTER_CONFIG_OPTIONS)
+    private readonly options: BetterConfigOptions,
     private readonly betterConfigService: BetterConfigService,
     private readonly envAuditService: EnvAuditService,
   ) {}
@@ -46,20 +44,26 @@ export class BetterConfigModule implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    let configService: ConfigService | undefined;
+    this.betterConfigService.initialize(this.resolveConfigService());
+    this.configureAudit();
+  }
+
+  private resolveConfigService(): ConfigService {
+    const configService = this.findConfigService();
+    if (!configService) throw new Error(MISSING_CONFIG_MODULE_ERROR);
+    return configService;
+  }
+
+  private findConfigService(): ConfigService | undefined {
     try {
-      configService = this.moduleRef.get(ConfigService, { strict: false });
+      return this.moduleRef.get(ConfigService, { strict: false });
     } catch {
-      // moduleRef.get may throw in strict mode — fall through to null check
+      // moduleRef.get may throw in strict mode — treat as not found
+      return undefined;
     }
-    if (!configService) {
-      throw new Error(
-        'BetterConfigModule requires ConfigModule to be imported before it in your module.',
-      );
-    }
+  }
 
-    this.betterConfigService.initialize(configService);
-
+  private configureAudit(): void {
     const auditOptions = this.options.audit ?? {};
     const declaredKeys = resolveEnvKeys({
       validationSchema: this.options.validationSchema,

@@ -3,10 +3,25 @@ import { ConfigService } from '@nestjs/config';
 const PATCHED = Symbol.for('nestjs-better-config:patched');
 const ACTIVE_SET = Symbol.for('nestjs-better-config:active-set');
 
+const TRACKED_METHODS = ['get', 'getOrThrow'] as const;
+
+type TrackedMethod = (typeof TRACKED_METHODS)[number];
+
 type PatchedPrototype = {
   [PATCHED]?: boolean;
   [ACTIVE_SET]?: Set<string>;
-} & Record<'get' | 'getOrThrow', (...args: unknown[]) => unknown>;
+} & Record<TrackedMethod, (...args: unknown[]) => unknown>;
+
+function wrapWithKeyTracking(
+  proto: PatchedPrototype,
+  method: TrackedMethod,
+): void {
+  const original = proto[method];
+  proto[method] = function (this: unknown, ...args: unknown[]) {
+    proto[ACTIVE_SET]?.add(String(args[0]));
+    return original.apply(this, args);
+  };
+}
 
 /**
  * Patches `get` and `getOrThrow` on ConfigService.prototype so every key
@@ -22,17 +37,12 @@ export function trackConfigServiceKeys(): Set<string> {
   const usedKeys = new Set<string>();
   proto[ACTIVE_SET] = usedKeys;
 
-  if (!proto[PATCHED]) {
-    proto[PATCHED] = true;
-    for (const method of ['get', 'getOrThrow'] as const) {
-      const original = proto[method];
-      proto[method] = function (this: unknown, ...args: unknown[]) {
-        proto[ACTIVE_SET]?.add(String(args[0]));
-        return original.apply(this, args);
-      };
-    }
-  }
+  if (proto[PATCHED]) return usedKeys;
 
+  proto[PATCHED] = true;
+  for (const method of TRACKED_METHODS) {
+    wrapWithKeyTracking(proto, method);
+  }
   return usedKeys;
 }
 
