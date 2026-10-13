@@ -9,10 +9,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # create the GitHub release
       id-token: write # npm provenance
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release notes need history and earlier tags
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,3 +44,10 @@ jobs:
             exit 1
           fi
       - run: npm publish --access public # auth + provenance via OIDC trusted publisher
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/release-notes.sh "$GITHUB_REF_NAME" |
+            gh release create "$GITHUB_REF_NAME" --verify-tag \
+              --title "$GITHUB_REF_NAME" --notes-file -
