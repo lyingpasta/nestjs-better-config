@@ -31,9 +31,9 @@
     "format": "prettier --write \"{src,test}/**/*.ts\""
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/config": "^3.0.0",
-    "@nestjs/core": "^10.0.0"
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/config": "^3.0.0 || ^4.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0"
   },
   "dependencies": {
     "dotenv": "^16.0.0"

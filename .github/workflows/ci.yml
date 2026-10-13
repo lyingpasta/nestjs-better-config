@@ -11,7 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [20, 22]
+        nest: [10, 11]
+        include:
+          - nest: 10
+            config: 3
+          - nest: 11
+            config: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +25,13 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - name: Install Nest ${{ matrix.nest }}
+        run: >
+          npm install --no-save --legacy-peer-deps
+          @nestjs/common@${{ matrix.nest }}
+          @nestjs/core@${{ matrix.nest }}
+          @nestjs/testing@${{ matrix.nest }}
+          @nestjs/config@${{ matrix.config }}
       - run: npm run lint
       - run: npm test
       - run: npm run build

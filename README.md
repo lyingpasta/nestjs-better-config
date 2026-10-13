@@ -27,7 +27,7 @@ keys you read against the keys you declared, and prints the difference.
 npm install nestjs-better-config
 ```
 
-Peer dependencies: `@nestjs/common ^10`, `@nestjs/core ^10`, `@nestjs/config ^3`.
+Peer dependencies: `@nestjs/common` and `@nestjs/core` `^10 || ^11`, `@nestjs/config` `^3 || ^4`.
 
 ## Usage
 
