@@ -1,9 +1,16 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
+import { BetterConfigAsyncOptions } from '../src/interfaces/better-config-async-options.interface';
+import { BetterConfigOptions } from '../src/interfaces/better-config-options.interface';
 import { BetterConfigModule } from '../src/better-config.module';
+import { IReporter } from '../src/reporters/reporter.interface';
 import { BetterConfigService } from '../src/better-config.service';
 import { EnvAuditService } from '../src/env-audit.service';
+
+interface RecordingReporter extends IReporter {
+  reportedKeys: string[];
+}
 
 describe('BetterConfigModule', () => {
   let logSpy: jest.SpyInstance;
@@ -192,6 +199,106 @@ describe('BetterConfigModule', () => {
         expect.stringContaining('environment variable'),
       );
       await module.close();
+    });
+  });
+
+  describe('forRootAsync', () => {
+    const USED_KEY = 'ASYNC_USED_KEY';
+    const UNUSED_KEY = 'ASYNC_UNUSED_KEY';
+    const AUDIT_ENABLED_KEY = 'ASYNC_AUDIT_ENABLED';
+    const DECLARED_KEYS = { [USED_KEY]: {}, [UNUSED_KEY]: {} };
+    let module: TestingModule | undefined;
+    let recorder: RecordingReporter;
+
+    function createRecordingReporter(): RecordingReporter {
+      const reportedKeys: string[] = [];
+      return {
+        reportedKeys,
+        reportUnused: (keys) => reportedKeys.push(...keys),
+        reportAllAccounted: () => undefined,
+      };
+    }
+
+    function buildOptions(auditEnabled = true): BetterConfigOptions {
+      return {
+        validationSchema: { shape: DECLARED_KEYS },
+        audit: { enabled: auditEnabled },
+        reporter: recorder,
+      };
+    }
+
+    async function bootAsync(
+      asyncOptions: BetterConfigAsyncOptions,
+      providers: Provider[] = [],
+    ): Promise<TestingModule> {
+      module = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({ ignoreEnvFile: true }),
+          BetterConfigModule.forRootAsync(asyncOptions),
+        ],
+        providers,
+      }).compile();
+      await module.init();
+      return module;
+    }
+
+    beforeEach(() => {
+      recorder = createRecordingReporter();
+    });
+
+    afterEach(async () => {
+      delete process.env[USED_KEY];
+      delete process.env[AUDIT_ENABLED_KEY];
+      await module?.close();
+      module = undefined;
+    });
+
+    it('boots with a sync factory and audits using its options', async () => {
+      await bootAsync({ useFactory: () => buildOptions() });
+      expect([...recorder.reportedKeys].sort()).toEqual(
+        [UNUSED_KEY, USED_KEY].sort(),
+      );
+    });
+
+    it('boots with an async factory', async () => {
+      await bootAsync({
+        useFactory: async () => {
+          await Promise.resolve();
+          return buildOptions();
+        },
+      });
+      expect([...recorder.reportedKeys].sort()).toEqual(
+        [UNUSED_KEY, USED_KEY].sort(),
+      );
+    });
+
+    it.each([
+      ['true', [UNUSED_KEY, USED_KEY]],
+      ['false', []],
+    ])(
+      'injects ConfigService into the factory (%s => reported %j)',
+      async (flag, expectedKeys) => {
+        process.env[AUDIT_ENABLED_KEY] = flag;
+        await bootAsync({
+          imports: [ConfigModule],
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) =>
+            buildOptions(config.get(AUDIT_ENABLED_KEY) === 'true'),
+        });
+        expect([...recorder.reportedKeys].sort()).toEqual(expectedKeys);
+      },
+    );
+
+    it('does not report keys read in a consumer constructor', async () => {
+      process.env[USED_KEY] = 'value';
+      @Injectable()
+      class Consumer {
+        constructor(config: ConfigService) {
+          config.get(USED_KEY);
+        }
+      }
+      await bootAsync({ useFactory: () => buildOptions() }, [Consumer]);
+      expect(recorder.reportedKeys).toEqual([UNUSED_KEY]);
     });
   });
 

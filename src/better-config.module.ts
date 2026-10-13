@@ -1,6 +1,13 @@
-import { DynamicModule, Inject, Module, OnModuleInit } from '@nestjs/common';
+import {
+  DynamicModule,
+  Inject,
+  Module,
+  OnModuleInit,
+  Provider,
+} from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { BetterConfigAsyncOptions } from './interfaces/better-config-async-options.interface';
 import { BetterConfigOptions } from './interfaces/better-config-options.interface';
 import {
   BetterConfigService,
@@ -23,16 +30,37 @@ export class BetterConfigModule implements OnModuleInit {
     private readonly envAuditService: EnvAuditService,
   ) {}
 
-  // TODO: implement forRootAsync (v1) — needed for async config factories
   static forRoot(options: BetterConfigOptions = {}): DynamicModule {
+    return BetterConfigModule.buildModule({
+      provide: BETTER_CONFIG_OPTIONS,
+      useValue: options,
+    });
+  }
+
+  static forRootAsync(asyncOptions: BetterConfigAsyncOptions): DynamicModule {
+    return BetterConfigModule.buildModule(
+      {
+        provide: BETTER_CONFIG_OPTIONS,
+        useFactory: asyncOptions.useFactory,
+        inject: asyncOptions.inject ?? [],
+      },
+      asyncOptions.imports,
+    );
+  }
+
+  private static buildModule(
+    optionsProvider: Provider,
+    imports: DynamicModule['imports'] = [],
+  ): DynamicModule {
     // Patch ConfigService.prototype now — module definition time — so key
     // reads in consumer constructors (which run before lifecycle hooks) are
     // already tracked.
     const usedKeys = trackConfigServiceKeys();
     return {
       module: BetterConfigModule,
+      imports,
       providers: [
-        { provide: BETTER_CONFIG_OPTIONS, useValue: options },
+        optionsProvider,
         {
           provide: BetterConfigService,
           useFactory: () => new BetterConfigService(usedKeys),

@@ -69,6 +69,23 @@ reading config exactly as before; nothing else changes.
 The audit runs on `onApplicationBootstrap` and is enabled by default whenever
 `NODE_ENV` is not `production`.
 
+### Async configuration
+
+When the options depend on other providers, use `forRootAsync`:
+
+```typescript
+BetterConfigModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) => ({
+    validationSchema: envSchema,
+    audit: { enabled: config.get('AUDIT_ENABLED') === 'true' },
+  }),
+})
+```
+
+Keys the factory itself reads through `ConfigService` count as used.
+
 ## Where the declared key list comes from
 
 You have two options.
@@ -115,6 +132,8 @@ BetterConfigModule.forRoot({
 | `audit.ignorePrefixes` | `[]` | Ignore any key starting with one of these. |
 | `reporter` | `ConsoleReporter` | Custom `IReporter` implementation, see below. |
 
+With `forRootAsync`, the `useFactory` returns this same object.
+
 `ignoreKeys` and `ignorePrefixes` are handy for variables that exist for the
 platform rather than for your code, like the `npm_*` family npm injects into
 every process.
@@ -156,8 +175,9 @@ BetterConfigModule.forRoot({
 
 ## How it works
 
-`forRoot()` wraps `get` and `getOrThrow` on `ConfigService.prototype` at
-module definition time, before Nest instantiates any provider. That ordering
+`forRoot()` and `forRootAsync()` wrap `get` and `getOrThrow` on
+`ConfigService.prototype` at module definition time, before Nest
+instantiates any provider, including an async options factory. That ordering
 matters: most config reads happen in constructors, which run before any
 lifecycle hook fires, so patching later would miss them. Each accessed key
 lands in a set, and at `onApplicationBootstrap` that set is diffed against
@@ -209,11 +229,9 @@ need it. For keys that genuinely can only be read later, list them in
   read for the first time inside a request handler or a cron job will show up
   as unused even though it isn't. If you have keys like that, put them in
   `ignoreKeys`.
-- `forRootAsync` isn't implemented yet, so options can't come from an async
-  factory.
 
-Planned next: `forRootAsync`, and further out an ESLint plugin so the same
-check can run statically at lint time instead of at runtime.
+Planned: an ESLint plugin, so the same check can run statically at lint time
+instead of at runtime.
 
 ## Contributing
 
