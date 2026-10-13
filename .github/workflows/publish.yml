@@ -24,14 +24,16 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Verify tarball contains the package entry
+        # Lists the real tarball rather than parsing `npm pack --json`, whose
+        # shape changed in npm 12.
         run: |
-          npm pack --dry-run --json | node -e "
-            const files = JSON.parse(require('fs').readFileSync(0))[0].files.map(f => f.path);
-            if (!files.includes('dist/index.js')) {
-              console.error('dist/index.js missing from tarball — refusing to publish. Files:', files);
-              process.exit(1);
-            }
-          "
+          TARBALL="$(npm pack --silent)"
+          if ! tar -tzf "$TARBALL" | grep -qx 'package/dist/index.js'; then
+            echo "dist/index.js missing from $TARBALL — refusing to publish." >&2
+            tar -tzf "$TARBALL" >&2
+            exit 1
+          fi
+          rm "$TARBALL"
       - name: Verify tag matches package version
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
