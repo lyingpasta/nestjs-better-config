@@ -8,8 +8,12 @@ describe('EnvAuditService', () => {
 
   beforeEach(() => {
     service = new EnvAuditService();
-    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -25,14 +29,18 @@ describe('EnvAuditService', () => {
         { enabled: true },
       );
       service.onApplicationBootstrap();
-      expect(logSpy).toHaveBeenCalledWith('All environment variables are accounted for. ✓');
+      expect(logSpy).toHaveBeenCalledWith(
+        'All environment variables are accounted for. ✓',
+      );
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('logs all-accounted when declaredKeys is empty', () => {
       service.configure([], new Set(), { enabled: true });
       service.onApplicationBootstrap();
-      expect(logSpy).toHaveBeenCalledWith('All environment variables are accounted for. ✓');
+      expect(logSpy).toHaveBeenCalledWith(
+        'All environment variables are accounted for. ✓',
+      );
     });
   });
 
@@ -50,18 +58,20 @@ describe('EnvAuditService', () => {
     });
 
     it('warns each unused key individually', () => {
-      service.configure(
-        ['OLD_KEY', 'DEAD_VAR'],
-        new Set(),
-        { enabled: true, warnOnUnused: true },
-      );
+      service.configure(['OLD_KEY', 'DEAD_VAR'], new Set(), {
+        enabled: true,
+        warnOnUnused: true,
+      });
       service.onApplicationBootstrap();
       expect(warnSpy).toHaveBeenCalledWith('  ✗ OLD_KEY');
       expect(warnSpy).toHaveBeenCalledWith('  ✗ DEAD_VAR');
     });
 
     it('warns with disable hint', () => {
-      service.configure(['OLD_KEY'], new Set(), { enabled: true, warnOnUnused: true });
+      service.configure(['OLD_KEY'], new Set(), {
+        enabled: true,
+        warnOnUnused: true,
+      });
       service.onApplicationBootstrap();
       expect(warnSpy).toHaveBeenCalledWith(
         'These may be safe to remove. Disable with audit.warnOnUnused: false',
@@ -69,11 +79,11 @@ describe('EnvAuditService', () => {
     });
 
     it('suppresses warn output when warnOnUnused: false', () => {
-      service.configure(
-        ['OLD_KEY'],
-        new Set(),
-        { enabled: true, warnOnUnused: false, throwOnUnused: false },
-      );
+      service.configure(['OLD_KEY'], new Set(), {
+        enabled: true,
+        warnOnUnused: false,
+        throwOnUnused: false,
+      });
       service.onApplicationBootstrap();
       expect(warnSpy).not.toHaveBeenCalled();
       expect(logSpy).not.toHaveBeenCalled();
@@ -94,13 +104,14 @@ describe('EnvAuditService', () => {
     });
 
     it('logs all-accounted when only ignored keys are unused', () => {
-      service.configure(
-        ['NODE_ENV'],
-        new Set(),
-        { enabled: true, ignoreKeys: ['NODE_ENV'] },
-      );
+      service.configure(['NODE_ENV'], new Set(), {
+        enabled: true,
+        ignoreKeys: ['NODE_ENV'],
+      });
       service.onApplicationBootstrap();
-      expect(logSpy).toHaveBeenCalledWith('All environment variables are accounted for. ✓');
+      expect(logSpy).toHaveBeenCalledWith(
+        'All environment variables are accounted for. ✓',
+      );
       expect(warnSpy).not.toHaveBeenCalled();
     });
   });
@@ -119,23 +130,24 @@ describe('EnvAuditService', () => {
     });
 
     it('logs all-accounted when only prefix-ignored keys are unused', () => {
-      service.configure(
-        ['npm_lifecycle_event'],
-        new Set(),
-        { enabled: true, ignorePrefixes: ['npm_'] },
-      );
+      service.configure(['npm_lifecycle_event'], new Set(), {
+        enabled: true,
+        ignorePrefixes: ['npm_'],
+      });
       service.onApplicationBootstrap();
-      expect(logSpy).toHaveBeenCalledWith('All environment variables are accounted for. ✓');
+      expect(logSpy).toHaveBeenCalledWith(
+        'All environment variables are accounted for. ✓',
+      );
     });
   });
 
   describe('throwOnUnused', () => {
     it('throws after logging when throwOnUnused: true', () => {
-      service.configure(
-        ['OLD_KEY', 'DEAD_VAR'],
-        new Set(),
-        { enabled: true, warnOnUnused: true, throwOnUnused: true },
-      );
+      service.configure(['OLD_KEY', 'DEAD_VAR'], new Set(), {
+        enabled: true,
+        warnOnUnused: true,
+        throwOnUnused: true,
+      });
       expect(() => service.onApplicationBootstrap()).toThrow(
         'BetterConfig: 2 unused environment variable(s) detected.',
       );
@@ -143,20 +155,18 @@ describe('EnvAuditService', () => {
     });
 
     it('does not throw when throwOnUnused: false', () => {
-      service.configure(
-        ['OLD_KEY'],
-        new Set(),
-        { enabled: true, throwOnUnused: false },
-      );
+      service.configure(['OLD_KEY'], new Set(), {
+        enabled: true,
+        throwOnUnused: false,
+      });
       expect(() => service.onApplicationBootstrap()).not.toThrow();
     });
 
     it('does not throw when no unused vars even if throwOnUnused: true', () => {
-      service.configure(
-        ['DATABASE_URL'],
-        new Set(['DATABASE_URL']),
-        { enabled: true, throwOnUnused: true },
-      );
+      service.configure(['DATABASE_URL'], new Set(['DATABASE_URL']), {
+        enabled: true,
+        throwOnUnused: true,
+      });
       expect(() => service.onApplicationBootstrap()).not.toThrow();
     });
   });
@@ -199,11 +209,10 @@ describe('EnvAuditService', () => {
     });
 
     it('does not throw even when throwOnUnused: true', () => {
-      service.configure(
-        ['OLD_KEY'],
-        new Set(),
-        { enabled: false, throwOnUnused: true },
-      );
+      service.configure(['OLD_KEY'], new Set(), {
+        enabled: false,
+        throwOnUnused: true,
+      });
       expect(() => service.onApplicationBootstrap()).not.toThrow();
     });
   });

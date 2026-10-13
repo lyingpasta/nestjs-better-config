@@ -10,7 +10,9 @@ describe('resolveEnvKeys', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -43,7 +45,9 @@ describe('resolveEnvKeys', () => {
 
   describe('.env file fallback', () => {
     it('parses specified envFilePath when no schema provided', () => {
-      mockReadFileSync.mockReturnValue('DATABASE_URL=postgres\nPORT=3000\n' as any);
+      mockReadFileSync.mockReturnValue(
+        'DATABASE_URL=postgres\nPORT=3000\n' as any,
+      );
       const result = resolveEnvKeys({ envFilePath: '.env.test' });
       expect(result).toEqual(['DATABASE_URL', 'PORT']);
       expect(mockReadFileSync).toHaveBeenCalledWith('.env.test', 'utf-8');
@@ -67,14 +71,18 @@ describe('resolveEnvKeys', () => {
       });
       const result = resolveEnvKeys({ envFilePath: '.env.missing' });
       expect(result).toEqual([]);
-      expect(warnSpy).toHaveBeenCalledWith('Could not read env file: .env.missing');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Could not read env file: .env.missing',
+      );
     });
 
     it('does not throw when env file is missing', () => {
       mockReadFileSync.mockImplementation(() => {
         throw new Error('ENOENT');
       });
-      expect(() => resolveEnvKeys({ envFilePath: '.env.missing' })).not.toThrow();
+      expect(() =>
+        resolveEnvKeys({ envFilePath: '.env.missing' }),
+      ).not.toThrow();
     });
   });
 
@@ -90,13 +98,19 @@ describe('resolveEnvKeys', () => {
     };
 
     it('filters out ignoreKeys', () => {
-      const result = resolveEnvKeys({ validationSchema: schema, ignoreKeys: ['NODE_ENV'] });
+      const result = resolveEnvKeys({
+        validationSchema: schema,
+        ignoreKeys: ['NODE_ENV'],
+      });
       expect(result).not.toContain('NODE_ENV');
       expect(result).toContain('DATABASE_URL');
     });
 
     it('filters out all keys matching ignorePrefixes', () => {
-      const result = resolveEnvKeys({ validationSchema: schema, ignorePrefixes: ['npm_'] });
+      const result = resolveEnvKeys({
+        validationSchema: schema,
+        ignorePrefixes: ['npm_'],
+      });
       expect(result).not.toContain('npm_lifecycle_event');
       expect(result).not.toContain('npm_config_cache');
       expect(result).toContain('DATABASE_URL');

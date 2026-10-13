@@ -10,8 +10,12 @@ describe('BetterConfigModule', () => {
   let warnSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -81,7 +85,9 @@ describe('BetterConfigModule', () => {
       }).compile();
       await module.init();
       const configService = module.get(ConfigService);
-      expect(configService.get('DATABASE_URL')).toBe('postgres://localhost/test');
+      expect(configService.get('DATABASE_URL')).toBe(
+        'postgres://localhost/test',
+      );
       const svc = module.get(BetterConfigService);
       expect(svc.usedKeys.has('DATABASE_URL')).toBe(true);
       delete process.env.DATABASE_URL;
@@ -122,7 +128,9 @@ describe('BetterConfigModule', () => {
       // no proxy.get() calls — all 3 keys unused
       await module.init();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('environment variable(s) declared but never accessed'),
+        expect.stringContaining(
+          'environment variable(s) declared but never accessed',
+        ),
       );
       await module.close();
     });
