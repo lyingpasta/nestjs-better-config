@@ -27,7 +27,11 @@ keys you read against the keys you declared, and prints the difference.
 npm install nestjs-better-config
 ```
 
-Peer dependencies: `@nestjs/common` and `@nestjs/core` `^10 || ^11`, `@nestjs/config` `^3 || ^4`.
+Peer dependencies: `@nestjs/common` and `@nestjs/core` `^10 || ^11 || ^12`,
+`@nestjs/config` `^3 || ^4 || ^12`.
+
+NestJS 12 ships as ES modules only. This package is CommonJS and loads it via
+Node's `require(esm)`, so Nest 12 apps need Node 20.19+ or 22.12+.
 
 ## Usage
 

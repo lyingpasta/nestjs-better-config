@@ -26,14 +26,15 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "jest",
     "test:cov": "jest --coverage",
+    "test:smoke": "npm run build && npm pack --pack-destination test/smoke/nest12 && cd test/smoke/nest12 && npm install --no-package-lock --no-save ./nestjs-better-config-*.tgz && npm run smoke",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
     "format": "prettier --write \"{src,test}/**/*.ts\""
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0 || ^11.0.0",
-    "@nestjs/config": "^3.0.0 || ^4.0.0",
-    "@nestjs/core": "^10.0.0 || ^11.0.0"
+    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/config": "^3.0.0 || ^4.0.0 || ^12.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0"
   },
   "dependencies": {
     "dotenv": "^16.0.0"
